@@ -65,6 +65,9 @@ function bindEvents() {
   $("#deleteTech").addEventListener("click", () => deleteEntity("Technician", $("#techId").value));
   $("#deleteVendor").addEventListener("click", () => deleteEntity("Vendor", $("#vendorId").value));
   els.jobPhotoInput.addEventListener("change", uploadJobPhotos);
+  $("#jobTypePreset").addEventListener("change", syncJobTypeInput);
+  $("#jobAmount").addEventListener("input", formatJobAmountInput);
+  $("#jobAmount").addEventListener("blur", formatJobAmountInput);
   els.saveSettings.addEventListener("click", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ scriptUrl: els.scriptUrlInput.value.trim() }));
     showToast("DB 설정을 저장했습니다.");
@@ -207,9 +210,9 @@ function openJobDialog(job = null) {
   $("#jobPhone").value = job?.phone || "";
   $("#jobReceiptNo").value = job?.receiptNo || "";
   $("#jobAddress").value = job?.address || "";
-  $("#jobType").value = job?.type || "";
+  setJobTypeValue(job?.type || "");
   $("#jobTech").value = job?.tech || "";
-  $("#jobAmount").value = toNumber(job?.amount);
+  $("#jobAmount").value = formatWon(job?.amount);
   $("#jobPaymentMethod").value = job?.paymentMethod || "계좌이체";
   $("#jobTaxDocType").value = job?.taxDocType || "간이영수증";
   $("#jobStatus").value = job?.status || "접수";
@@ -224,6 +227,8 @@ function openJobDialog(job = null) {
 async function submitJob(event) {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(els.jobForm).entries());
+  values.type = getJobTypeValue();
+  values.amount = toNumber(values.amount);
   const existing = state.jobs.find((item) => item.id === values.id) || {};
   const matchedCustomer = state.customers.find((item) => item.name === values.customer && item.phone === values.phone);
   const customer = matchedCustomer || (values.customer ? {
@@ -232,7 +237,7 @@ async function submitJob(event) {
   } : null);
   const job = {
     ...existing, ...values, id: values.id || createId(), customerId: customer?.id || existing.customerId || "",
-    amount: toNumber(values.amount), paid: $("#jobPaid").checked,
+    amount: values.amount, paid: $("#jobPaid").checked,
     createdAt: existing.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString()
   };
   await saveEntity("upsertJob", { job, customer }, "job", job.id, els.jobDialog, "작업을 저장했습니다.");
@@ -264,8 +269,17 @@ async function submitTech(event) {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(els.techForm).entries());
   const existing = state.technicians.find((item) => item.id === values.id) || {};
+  const duplicatePhone = findDuplicatePhone(values.phone, state.technicians, values.id, ["phone"]);
+  if (duplicatePhone) {
+    showToast(`이미 등록된 기사 전화번호입니다: ${duplicatePhone.name || duplicatePhone.phone}`);
+    return;
+  }
+  const requestedName = values.name;
+  values.name = resolveDuplicateName(values.name, state.technicians, values.id);
+  if (values.name !== requestedName && !confirmDuplicateNameSuffix(requestedName, values.name)) return;
   const technician = withTimestamps(existing, values);
-  await saveEntity("upsertTechnician", technician, "technician", technician.id, els.techDialog, "기사를 저장했습니다.");
+  const message = values.name !== requestedName ? `중복된 이름이라 ${values.name}(으)로 저장했습니다.` : "기사를 저장했습니다.";
+  await saveEntity("upsertTechnician", technician, "technician", technician.id, els.techDialog, message);
 }
 
 function openVendorDialog(vendor = null) {
@@ -284,12 +298,63 @@ async function submitVendor(event) {
   const values = Object.fromEntries(new FormData(els.vendorForm).entries());
   values.technicianIds = [...els.vendorForm.querySelectorAll('input[name="technicianIds"]:checked')].map((item) => item.value).join(",");
   const existing = state.vendors.find((item) => item.id === values.id) || {};
+  const duplicatePhone = findDuplicatePhone(values.phone, state.vendors, values.id, ["phone", "mobile"]) || findDuplicatePhone(values.mobile, state.vendors, values.id, ["phone", "mobile"]);
+  if (duplicatePhone) {
+    showToast(`이미 등록된 업체 전화번호입니다: ${duplicatePhone.name || duplicatePhone.phone || duplicatePhone.mobile}`);
+    return;
+  }
+  const requestedName = values.name;
+  values.name = resolveDuplicateName(values.name, state.vendors, values.id);
+  if (values.name !== requestedName && !confirmDuplicateNameSuffix(requestedName, values.name)) return;
   const vendor = withTimestamps(existing, values);
-  await saveEntity("upsertVendor", vendor, "vendor", vendor.id, els.vendorDialog, "업체를 저장했습니다.");
+  const message = values.name !== requestedName ? `중복된 이름이라 ${values.name}(으)로 저장했습니다.` : "업체를 저장했습니다.";
+  await saveEntity("upsertVendor", vendor, "vendor", vendor.id, els.vendorDialog, message);
 }
 
 function withTimestamps(existing, values) {
   return { ...existing, ...values, id: values.id || createId(), createdAt: existing.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+}
+
+function normalizeText(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizePhone(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function resolveDuplicateName(name, collection, currentId) {
+  const baseName = String(name || "").trim();
+  if (!baseName) return baseName;
+  const usedNames = new Set(
+    (collection || [])
+      .filter((item) => item.id !== currentId)
+      .map((item) => normalizeText(item.name))
+      .filter(Boolean)
+  );
+  if (!usedNames.has(normalizeText(baseName))) return baseName;
+
+  let index = 2;
+  let nextName = `${baseName}${index}`;
+  while (usedNames.has(normalizeText(nextName))) {
+    index += 1;
+    nextName = `${baseName}${index}`;
+  }
+  return nextName;
+}
+
+function confirmDuplicateNameSuffix(originalName, nextName) {
+  alert(`이미 등록된 이름입니다: ${originalName}`);
+  return confirm(`${nextName}(으)로 이름 뒤에 숫자를 붙여 저장할까요?`);
+}
+
+function findDuplicatePhone(phone, collection, currentId, fields) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+  return (collection || []).find((item) => {
+    if (item.id === currentId) return false;
+    return fields.some((field) => normalizePhone(item[field]) === normalized);
+  }) || null;
 }
 
 function fillForm(form, data) {
@@ -480,6 +545,35 @@ function renderVendorCard(item) {
 
 function renderTechOptions() {
   els.techOptions.innerHTML = state.technicians.map((tech) => `<option value="${escapeHtml(tech.name || "")}"></option>`).join("");
+}
+
+function getJobTypeValue() {
+  return $("#jobTypePreset").value === "직접입력" ? $("#jobType").value.trim() : $("#jobTypePreset").value;
+}
+
+function setJobTypeValue(value) {
+  const preset = $("#jobTypePreset");
+  const input = $("#jobType");
+  const normalized = String(value || "").trim();
+  const hasOption = [...preset.options].some((option) => option.value === normalized);
+  if (normalized && hasOption) {
+    preset.value = normalized;
+    input.value = "";
+  } else {
+    preset.value = "직접입력";
+    input.value = normalized;
+  }
+  syncJobTypeInput();
+}
+
+function syncJobTypeInput() {
+  const isCustom = $("#jobTypePreset").value === "직접입력";
+  $("#jobType").hidden = !isCustom;
+  $("#jobType").required = isCustom;
+}
+
+function formatJobAmountInput() {
+  $("#jobAmount").value = formatWon($("#jobAmount").value);
 }
 
 function sortJobs(jobs) {

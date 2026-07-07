@@ -303,6 +303,16 @@ select {
   background: #fff;
 }
 
+.custom-option {
+  background: #ffe1ec;
+  color: #b01255;
+  font-weight: 800;
+}
+
+.dialog-card input[hidden] {
+  display: none;
+}
+
 .tab-panel {
   display: none;
   padding: 14px;

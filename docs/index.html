@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=20260708-5" />
     <link rel="apple-touch-icon" href="./app-icon.png" />
     <link rel="icon" href="./app-icon.png" />
-    <link rel="stylesheet" href="./mobile.css?v=20260708-5" />
+    <link rel="stylesheet" href="./mobile.css?v=20260708-8" />
     <style>
       body.auth-locked .app-header,
       body.auth-locked .app-main {
@@ -216,23 +216,33 @@
           </label>
           <label>
             접수번호
-            <input id="jobReceiptNo" name="receiptNo" type="text" />
+            <input id="jobReceiptNo" name="receiptNo" type="text" placeholder="예: 진이폰, 성필폰, 업무폰" />
           </label>
           <label class="full">
             주소
             <input id="jobAddress" name="address" type="text" autocomplete="street-address" />
           </label>
           <label>
-            작업내용
-            <input id="jobType" name="type" type="text" placeholder="예: 고압세척" required />
+            작업종류
+            <select id="jobTypePreset">
+              <option value="직접입력" class="custom-option">직접입력</option>
+              <option>하수구 막힘</option>
+              <option>싱크대 배관</option>
+              <option>변기 막힘</option>
+              <option>횡주관</option>
+              <option>고압세척</option>
+              <option>내시경 점검</option>
+              <option>정기관리</option>
+            </select>
+            <input id="jobType" name="type" type="text" placeholder="작업종류 직접입력" required />
           </label>
           <label>
             담당기사
-            <input id="jobTech" name="tech" type="text" list="techOptions" />
+            <input id="jobTech" name="tech" type="text" list="techOptions" placeholder="예: 뚱보, 러쉬케어, 홍길동" />
           </label>
           <label>
             청구금액
-            <input id="jobAmount" name="amount" type="number" min="0" step="1000" inputmode="numeric" />
+            <input id="jobAmount" name="amount" type="text" inputmode="numeric" />
           </label>
           <label>
             결제수단
@@ -324,6 +334,6 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./mobile.js?v=20260708-5"></script>
+    <script src="./mobile.js?v=20260708-8"></script>
   </body>
 </html>
