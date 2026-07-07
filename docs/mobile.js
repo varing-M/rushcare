@@ -54,6 +54,7 @@ const els = {
 init();
 
 function init() {
+  registerServiceWorker();
   els.todayLabel.textContent = new Intl.DateTimeFormat("ko-KR", {
     year: "numeric",
     month: "long",
@@ -79,6 +80,11 @@ function init() {
   } else {
     els.loginId.focus();
   }
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("./service-worker.js").catch(() => {});
 }
 
 function bindEvents() {
