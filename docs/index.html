@@ -4,7 +4,41 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>러쉬케어 모바일</title>
-    <link rel="stylesheet" href="./mobile.css" />
+    <link rel="stylesheet" href="./mobile.css?v=20260708-2" />
+    <style>
+      body.auth-locked .app-header,
+      body.auth-locked .app-main {
+        display: none;
+      }
+
+      .login-screen[hidden] {
+        display: none !important;
+      }
+
+      .login-screen {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 22px;
+      }
+
+      .login-card {
+        width: min(430px, 100%);
+      }
+
+      .login-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .login-brand img {
+        width: 46px;
+        height: 46px;
+        border-radius: 8px;
+        object-fit: cover;
+      }
+    </style>
   </head>
   <body class="auth-locked">
     <section class="login-screen" id="loginScreen" aria-label="로그인">
@@ -218,6 +252,6 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./mobile.js"></script>
+    <script src="./mobile.js?v=20260708-2"></script>
   </body>
 </html>
