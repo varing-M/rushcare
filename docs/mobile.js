@@ -1,5 +1,7 @@
 const STORAGE_KEY = "rushcare.mobile.settings.v1";
 const CACHE_KEY = "rushcare.mobile.cache.v1";
+const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyR3mD2MHpmjRoq8-wp5C3ooD08S7cF_rM2pG-rhRjKuqC8aHLUjJxUTOXyDXlHjPNd/exec";
+const ADMIN_LOGIN = { username: "wbwl009", password: "5479", name: "관리자", role: "admin" };
 const todayISO = localDateISO(new Date());
 
 let state = {
@@ -12,6 +14,12 @@ let activeTab = "today";
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
+  loginScreen: $("#loginScreen"),
+  loginForm: $("#loginForm"),
+  loginId: $("#loginId"),
+  loginPassword: $("#loginPassword"),
+  loginMessage: $("#loginMessage"),
+  loginSubmit: $("#loginSubmit"),
   todayLabel: $("#todayLabel"),
   reloadBtn: $("#reloadBtn"),
   openSettings: $("#openSettings"),
@@ -63,15 +71,11 @@ function init() {
   }
 
   bindEvents();
-
-  if (settings.scriptUrl) {
-    loadFromDb();
-  } else {
-    showToast("DB 설정에 Apps Script 웹앱 URL을 입력하세요.");
-  }
+  els.loginId.focus();
 }
 
 function bindEvents() {
+  els.loginForm.addEventListener("submit", login);
   els.reloadBtn.addEventListener("click", loadFromDb);
   els.openSettings.addEventListener("click", () => els.settingsDialog.showModal());
   els.openJobDialog.addEventListener("click", openJobDialog);
@@ -94,12 +98,57 @@ function bindEvents() {
   });
 }
 
+function login(event) {
+  event.preventDefault();
+  const username = els.loginId.value.trim();
+  const password = els.loginPassword.value.trim();
+  setLoginMessage("확인 중입니다.");
+  els.loginSubmit.disabled = true;
+
+  if (username === ADMIN_LOGIN.username && password === ADMIN_LOGIN.password) {
+    completeLogin(ADMIN_LOGIN);
+    els.loginSubmit.disabled = false;
+    return;
+  }
+
+  jsonp(getScriptUrl(), { action: "authUser", username, password })
+    .then((result) => {
+      if (!result || !result.ok) throw new Error(result && result.error ? result.error : "로그인에 실패했습니다.");
+      completeLogin(result.user || { username, name: username, role: "user" });
+    })
+    .catch((error) => setLoginMessage(error.message || "DB 서버 오류입니다. 관리자에게 문의하세요.", true))
+    .finally(() => {
+      els.loginSubmit.disabled = false;
+    });
+}
+
+function completeLogin(user) {
+  window.rushcareCurrentUser = user;
+  els.loginPassword.value = "";
+  setLoginMessage("");
+  document.body.classList.remove("auth-locked");
+  els.loginScreen.hidden = true;
+  els.loginScreen.style.display = "none";
+  showToast(`${user.name || user.username} 계정으로 접속했습니다.`);
+  loadFromDb();
+}
+
+function setLoginMessage(message, isError = false) {
+  els.loginMessage.textContent = message;
+  els.loginMessage.classList.toggle("error", isError);
+}
+
 function getSettings() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    return { scriptUrl: parsed.scriptUrl || DEFAULT_SCRIPT_URL };
   } catch {
-    return {};
+    return { scriptUrl: DEFAULT_SCRIPT_URL };
   }
+}
+
+function getScriptUrl() {
+  return getSettings().scriptUrl || DEFAULT_SCRIPT_URL;
 }
 
 function loadCache() {
@@ -112,7 +161,7 @@ function loadCache() {
 }
 
 function loadFromDb() {
-  const { scriptUrl } = getSettings();
+  const scriptUrl = getScriptUrl();
   if (!scriptUrl) {
     els.settingsDialog.showModal();
     showToast("DB URL을 먼저 저장하세요.");
@@ -148,7 +197,7 @@ function openJobDialog() {
 
 function submitJob(event) {
   event.preventDefault();
-  const { scriptUrl } = getSettings();
+  const scriptUrl = getScriptUrl();
   if (!scriptUrl) {
     els.jobDialog.close();
     els.settingsDialog.showModal();

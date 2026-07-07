@@ -6,7 +6,30 @@
     <title>러쉬케어 모바일</title>
     <link rel="stylesheet" href="./mobile.css" />
   </head>
-  <body>
+  <body class="auth-locked">
+    <section class="login-screen" id="loginScreen" aria-label="로그인">
+      <form class="login-card" id="loginForm">
+        <div class="login-brand">
+          <img src="./아이콘.png" alt="러쉬케어" />
+          <div>
+            <strong>러쉬케어</strong>
+            <span>모바일 현황</span>
+          </div>
+        </div>
+        <h1>로그인</h1>
+        <label>
+          아이디
+          <input id="loginId" autocomplete="username" required />
+        </label>
+        <label>
+          비밀번호
+          <input id="loginPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="login-message" id="loginMessage"></p>
+        <button id="loginSubmit" type="submit">접속</button>
+      </form>
+    </section>
+
     <header class="app-header">
       <div class="brand">
         <img src="./아이콘.png" alt="러쉬케어" />
