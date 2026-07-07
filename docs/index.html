@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="러쉬케어" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>러쉬케어 모바일</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=20260708-4" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260708-5" />
     <link rel="apple-touch-icon" href="./app-icon.png" />
     <link rel="icon" href="./app-icon.png" />
-    <link rel="stylesheet" href="./mobile.css?v=20260708-4" />
+    <link rel="stylesheet" href="./mobile.css?v=20260708-5" />
     <style>
       body.auth-locked .app-header,
       body.auth-locked .app-main {
@@ -119,6 +119,7 @@
         <button type="button" data-tab="customers">고객</button>
         <button type="button" data-tab="payments">수금</button>
         <button type="button" data-tab="techs">기사</button>
+        <button type="button" data-tab="vendors">업체</button>
       </nav>
 
       <section class="search-panel">
@@ -144,7 +145,7 @@
       <section class="tab-panel" id="customersPanel">
         <div class="section-head">
           <h2>고객 관리</h2>
-          <span id="customersCount">0명</span>
+          <div><span id="customersCount">0명</span><button class="mini-add" type="button" data-new="customer">추가</button></div>
         </div>
         <div class="card-list" id="customersList"></div>
       </section>
@@ -160,9 +161,17 @@
       <section class="tab-panel" id="techsPanel">
         <div class="section-head">
           <h2>기사 관리</h2>
-          <span id="techsCount">0명</span>
+          <div><span id="techsCount">0명</span><button class="mini-add" type="button" data-new="tech">추가</button></div>
         </div>
         <div class="card-list" id="techsList"></div>
+      </section>
+
+      <section class="tab-panel" id="vendorsPanel">
+        <div class="section-head">
+          <h2>업체 관리</h2>
+          <div><span id="vendorsCount">0곳</span><button class="mini-add" type="button" data-new="vendor">추가</button></div>
+        </div>
+        <div class="card-list" id="vendorsList"></div>
       </section>
     </main>
 
@@ -184,10 +193,11 @@
     <dialog id="jobDialog">
       <form id="jobForm" class="dialog-card">
         <div class="section-head">
-          <h2>새 작업 등록</h2>
+          <h2 id="jobDialogTitle">새 작업 등록</h2>
           <button id="closeJobDialog" type="button" aria-label="닫기">닫기</button>
         </div>
         <div class="form-grid">
+          <input id="jobId" name="id" type="hidden" />
           <label>
             방문일
             <input id="jobDate" name="date" type="date" required />
@@ -203,6 +213,10 @@
           <label>
             연락처
             <input id="jobPhone" name="phone" type="tel" autocomplete="tel" />
+          </label>
+          <label>
+            접수번호
+            <input id="jobReceiptNo" name="receiptNo" type="text" />
           </label>
           <label class="full">
             주소
@@ -248,17 +262,68 @@
               <option value="미수금">미수금</option>
             </select>
           </label>
+          <label class="check-label">
+            <input id="jobPaid" name="paid" type="checkbox" /> 수금완료
+          </label>
           <label class="full">
             메모
             <textarea id="jobMemo" name="memo" rows="3"></textarea>
           </label>
         </div>
+        <section id="jobPhotos" class="photo-section" hidden>
+          <strong>현장 사진</strong>
+          <input id="jobPhotoInput" type="file" accept="image/*" capture="environment" multiple />
+          <div id="jobPhotoList" class="photo-list"></div>
+        </section>
         <datalist id="techOptions"></datalist>
-        <button id="saveJob" type="submit">등록</button>
+        <div class="dialog-actions"><button id="deleteJob" class="danger-button" type="button" hidden>삭제</button><button id="saveJob" type="submit">저장</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="customerDialog">
+      <form id="customerForm" class="dialog-card entity-form">
+        <div class="section-head"><h2 id="customerDialogTitle">고객 등록</h2><button type="button" data-close-dialog="customerDialog">닫기</button></div>
+        <input id="customerId" name="id" type="hidden" />
+        <label>고객명<input name="name" required /></label>
+        <label>연락처<input name="phone" type="tel" /></label>
+        <label>주소<input name="address" /></label>
+        <label>건물유형<input name="building" /></label>
+        <label>관리주기<input name="cycle" /></label>
+        <label>메모<textarea name="note" rows="3"></textarea></label>
+        <div class="dialog-actions"><button id="deleteCustomer" class="danger-button" type="button" hidden>삭제</button><button type="submit">저장</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="techDialog">
+      <form id="techForm" class="dialog-card entity-form">
+        <div class="section-head"><h2 id="techDialogTitle">기사 등록</h2><button type="button" data-close-dialog="techDialog">닫기</button></div>
+        <input id="techId" name="id" type="hidden" />
+        <label>기사명<input name="name" required /></label>
+        <label>연락처<input name="phone" type="tel" /></label>
+        <label>사업자등록번호<input name="businessNo" /></label>
+        <label>메모<textarea name="note" rows="3"></textarea></label>
+        <div class="dialog-actions"><button id="deleteTech" class="danger-button" type="button" hidden>삭제</button><button type="submit">저장</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="vendorDialog">
+      <form id="vendorForm" class="dialog-card entity-form">
+        <div class="section-head"><h2 id="vendorDialogTitle">업체 등록</h2><button type="button" data-close-dialog="vendorDialog">닫기</button></div>
+        <input id="vendorId" name="id" type="hidden" />
+        <label>업체명<input name="name" required /></label>
+        <label>사업자등록번호<input name="businessNo" /></label>
+        <label>대표자<input name="owner" /></label>
+        <label>업종<input name="businessType" /></label>
+        <label>전화번호<input name="phone" type="tel" /></label>
+        <label>휴대폰번호<input name="mobile" type="tel" /></label>
+        <label>주소<input name="address" /></label>
+        <fieldset><legend>소속기사</legend><div id="vendorTechChecks" class="check-list"></div></fieldset>
+        <label>메모<textarea name="note" rows="3"></textarea></label>
+        <div class="dialog-actions"><button id="deleteVendor" class="danger-button" type="button" hidden>삭제</button><button type="submit">저장</button></div>
       </form>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./mobile.js?v=20260708-4"></script>
+    <script src="./mobile.js?v=20260708-5"></script>
   </body>
 </html>
