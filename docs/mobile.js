@@ -1,7 +1,9 @@
 const STORAGE_KEY = "rushcare.mobile.settings.v1";
 const CACHE_KEY = "rushcare.mobile.cache.v1";
+const SESSION_KEY = "rushcare.mobile.session.v1";
 const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyR3mD2MHpmjRoq8-wp5C3ooD08S7cF_rM2pG-rhRjKuqC8aHLUjJxUTOXyDXlHjPNd/exec";
 const ADMIN_LOGIN = { username: "wbwl009", password: "5479", name: "관리자", role: "admin" };
+const SESSION_HOURS = 24;
 const todayISO = localDateISO(new Date());
 
 let state = {
@@ -71,7 +73,12 @@ function init() {
   }
 
   bindEvents();
-  els.loginId.focus();
+  const session = loadSession();
+  if (session) {
+    completeLogin(session.user);
+  } else {
+    els.loginId.focus();
+  }
 }
 
 function bindEvents() {
@@ -123,6 +130,12 @@ function login(event) {
 }
 
 function completeLogin(user) {
+  saveSession(user);
+  finishLogin(user);
+  loadFromDb();
+}
+
+function finishLogin(user) {
   window.rushcareCurrentUser = user;
   els.loginPassword.value = "";
   setLoginMessage("");
@@ -130,12 +143,30 @@ function completeLogin(user) {
   els.loginScreen.hidden = true;
   els.loginScreen.style.display = "none";
   showToast(`${user.name || user.username} 계정으로 접속했습니다.`);
-  loadFromDb();
 }
 
 function setLoginMessage(message, isError = false) {
   els.loginMessage.textContent = message;
   els.loginMessage.classList.toggle("error", isError);
+}
+
+function saveSession(user) {
+  const expiresAt = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ user, expiresAt }));
+}
+
+function loadSession() {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    if (!session || !session.user || Date.now() > Number(session.expiresAt || 0)) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return session;
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
 }
 
 function getSettings() {
