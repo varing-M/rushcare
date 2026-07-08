@@ -22,6 +22,7 @@ const els = {
   vendorDialog: $("#vendorDialog"), vendorForm: $("#vendorForm"), techOptions: $("#techOptions"),
   jobPhotoInput: $("#jobPhotoInput"), jobPhotoList: $("#jobPhotoList"),
   metricToday: $("#metricToday"), metricActive: $("#metricActive"), metricRevenue: $("#metricRevenue"),
+  metricOutsourceFee: $("#metricOutsourceFee"),
   metricUnpaid: $("#metricUnpaid"), todayCount: $("#todayCount"), jobsCount: $("#jobsCount"),
   customersCount: $("#customersCount"), paymentsCount: $("#paymentsCount"), techsCount: $("#techsCount"),
   vendorsCount: $("#vendorsCount"), todayList: $("#todayList"), jobsList: $("#jobsList"),
@@ -68,6 +69,8 @@ function bindEvents() {
   $("#jobTypePreset").addEventListener("change", syncJobTypeInput);
   $("#jobAmount").addEventListener("input", formatJobAmountInput);
   $("#jobAmount").addEventListener("blur", formatJobAmountInput);
+  $("#jobFee").addEventListener("input", formatJobFeeInput);
+  $("#jobFee").addEventListener("blur", formatJobFeeInput);
   els.saveSettings.addEventListener("click", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ scriptUrl: els.scriptUrlInput.value.trim() }));
     showToast("DB 설정을 저장했습니다.");
@@ -213,9 +216,10 @@ function openJobDialog(job = null) {
   setJobTypeValue(job?.type || "");
   $("#jobTech").value = job?.tech || "";
   $("#jobAmount").value = formatWon(job?.amount);
+  $("#jobFee").value = formatWon(job?.fee);
   $("#jobPaymentMethod").value = job?.paymentMethod || "계좌이체";
   $("#jobTaxDocType").value = job?.taxDocType || "간이영수증";
-  $("#jobStatus").value = job?.status || "접수";
+  $("#jobStatus").value = normalizeStatusName(job?.status || "접수");
   $("#jobPaid").checked = Boolean(job?.paid);
   $("#jobMemo").value = job?.memo || "";
   $("#jobPhotos").hidden = !job;
@@ -229,6 +233,8 @@ async function submitJob(event) {
   const values = Object.fromEntries(new FormData(els.jobForm).entries());
   values.type = getJobTypeValue();
   values.amount = toNumber(values.amount);
+  values.fee = toNumber(values.fee);
+  values.status = resolveJobStatusForSave(values.status, $("#jobPaid").checked);
   const existing = state.jobs.find((item) => item.id === values.id) || {};
   const matchedCustomer = state.customers.find((item) => item.name === values.customer && item.phone === values.phone);
   const customer = matchedCustomer || (values.customer ? {
@@ -237,7 +243,7 @@ async function submitJob(event) {
   } : null);
   const job = {
     ...existing, ...values, id: values.id || createId(), customerId: customer?.id || existing.customerId || "",
-    amount: values.amount, paid: $("#jobPaid").checked,
+    amount: values.amount, fee: values.fee, paid: resolveJobPaidForSave(values.status, $("#jobPaid").checked),
     createdAt: existing.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString()
   };
   await saveEntity("upsertJob", { job, customer }, "job", job.id, els.jobDialog, "작업을 저장했습니다.");
@@ -408,7 +414,7 @@ async function deleteEntity(type, id) {
 async function markPaid(id) {
   const existing = state.jobs.find((job) => job.id === id);
   if (!existing || busy) return;
-  const job = { ...existing, paid: true, status: existing.status === "미수금" ? "완료" : existing.status, updatedAt: new Date().toISOString() };
+  const job = { ...existing, paid: true, status: "작업완료", updatedAt: new Date().toISOString() };
   await saveEntity("upsertJob", { job, customer: null }, "job", id, { close() {} }, "수금완료로 변경했습니다.");
 }
 
@@ -475,7 +481,41 @@ function normalizeData(data) {
 }
 
 function normalizeJob(job) {
-  return { ...job, date: normalizeDate(job.date), amount: toNumber(job.amount), paid: job.paid === true || job.paid === "true" };
+  const status = normalizeStatusName(job.status);
+  const paid = status === "작업완료"
+    ? true
+    : status === "작업완료(미수)"
+      ? false
+      : job.paid === true || job.paid === "true";
+  return { ...job, date: normalizeDate(job.date), amount: toNumber(job.amount), fee: toNumber(job.fee), status, paid };
+}
+
+function normalizeStatusName(status) {
+  const value = String(status || "접수").trim();
+  const map = { "출동": "예약", "완료": "작업완료", "미수금": "작업완료(미수)", "취소": "접수취소" };
+  return map[value] || value;
+}
+
+function isActiveStatus(status) {
+  return !["작업완료", "작업완료(미수)", "접수취소"].includes(normalizeStatusName(status));
+}
+
+function isUnpaidJob(job) {
+  return !job.paid || normalizeStatusName(job.status) === "작업완료(미수)";
+}
+
+function resolveJobStatusForSave(status, paid) {
+  const normalized = normalizeStatusName(status);
+  if (normalized === "작업완료(미수)" && paid) return "작업완료";
+  if (normalized === "작업완료" && !paid) return "작업완료(미수)";
+  return normalized;
+}
+
+function resolveJobPaidForSave(status, paid) {
+  const normalized = normalizeStatusName(status);
+  if (normalized === "작업완료") return true;
+  if (normalized === "작업완료(미수)") return false;
+  return paid;
 }
 
 function normalizeDate(value) {
@@ -493,7 +533,7 @@ function render() {
   const techs = state.technicians.filter((item) => matchesText([item.name, item.phone, item.businessNo, item.note], query));
   const vendors = state.vendors.filter((item) => matchesText([item.name, item.businessNo, item.owner, item.phone, item.mobile, item.address, item.note], query));
   const todayJobs = filteredJobs.filter((job) => job.date === todayISO);
-  const payments = filteredJobs.filter((job) => !job.paid || job.status === "미수금");
+  const payments = filteredJobs.filter((job) => isUnpaidJob(job));
 
   renderMetrics(jobs);
   renderList(els.todayList, todayJobs, renderJobCard, "오늘 일정이 없습니다.");
@@ -511,9 +551,11 @@ function render() {
 function renderMetrics(jobs) {
   const ym = todayISO.slice(0, 7);
   els.metricToday.textContent = jobs.filter((job) => job.date === todayISO).length;
-  els.metricActive.textContent = jobs.filter((job) => !["완료", "취소"].includes(job.status || "")).length;
-  els.metricRevenue.textContent = formatWon(jobs.filter((job) => job.date?.slice(0, 7) === ym && job.status === "완료").reduce((sum, job) => sum + job.amount, 0));
-  els.metricUnpaid.textContent = formatWon(jobs.filter((job) => !job.paid || job.status === "미수금").reduce((sum, job) => sum + job.amount, 0));
+  els.metricActive.textContent = jobs.filter((job) => isActiveStatus(job.status)).length;
+  const paidMonthJobs = jobs.filter((job) => job.date?.slice(0, 7) === ym && job.paid);
+  els.metricRevenue.textContent = formatWon(paidMonthJobs.reduce((sum, job) => sum + job.amount - job.fee, 0));
+  els.metricOutsourceFee.textContent = formatWon(paidMonthJobs.reduce((sum, job) => sum + job.fee, 0));
+  els.metricUnpaid.textContent = formatWon(jobs.filter((job) => isUnpaidJob(job)).reduce((sum, job) => sum + job.amount, 0));
 }
 
 function renderList(target, items, renderer, emptyText) {
@@ -574,6 +616,10 @@ function syncJobTypeInput() {
 
 function formatJobAmountInput() {
   $("#jobAmount").value = formatWon($("#jobAmount").value);
+}
+
+function formatJobFeeInput() {
+  $("#jobFee").value = formatWon($("#jobFee").value);
 }
 
 function sortJobs(jobs) {

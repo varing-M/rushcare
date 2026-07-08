@@ -1,4 +1,4 @@
-const CACHE_NAME = "rushcare-mobile-v20260708-8";
+const CACHE_NAME = "rushcare-mobile-v20260708-12";
 const APP_FILES = [
   "./",
   "./index.html",

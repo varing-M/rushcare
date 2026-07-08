@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=20260708-5" />
     <link rel="apple-touch-icon" href="./app-icon.png" />
     <link rel="icon" href="./app-icon.png" />
-    <link rel="stylesheet" href="./mobile.css?v=20260708-8" />
+    <link rel="stylesheet" href="./mobile.css?v=20260708-12" />
     <style>
       body.auth-locked .app-header,
       body.auth-locked .app-main {
@@ -104,8 +104,12 @@
           <strong id="metricActive">0</strong>
         </article>
         <article>
-          <span>이번달 매출</span>
+          <span>외주 수수료 제외한 이번달 매출</span>
           <strong id="metricRevenue">0원</strong>
+        </article>
+        <article>
+          <span>지급한 외주 수수료</span>
+          <strong id="metricOutsourceFee">0원</strong>
         </article>
         <article class="danger">
           <span>미수금</span>
@@ -237,12 +241,16 @@
             <input id="jobType" name="type" type="text" placeholder="작업종류 직접입력" required />
           </label>
           <label>
-            담당기사
+            담당 업체 또는 담당기사
             <input id="jobTech" name="tech" type="text" list="techOptions" placeholder="예: 뚱보, 러쉬케어, 홍길동" />
           </label>
           <label>
             청구금액
             <input id="jobAmount" name="amount" type="text" inputmode="numeric" />
+          </label>
+          <label>
+            외주 수수료
+            <input id="jobFee" name="fee" type="text" inputmode="numeric" />
           </label>
           <label>
             결제수단
@@ -266,10 +274,11 @@
             상태
             <select id="jobStatus" name="status">
               <option value="접수">접수</option>
-              <option value="출동">출동</option>
+              <option value="접수취소">접수취소</option>
               <option value="작업중">작업중</option>
-              <option value="완료">완료</option>
-              <option value="미수금">미수금</option>
+              <option value="예약">예약</option>
+              <option value="작업완료">작업완료</option>
+              <option value="작업완료(미수)">작업완료(미수)</option>
             </select>
           </label>
           <label class="check-label">
@@ -334,6 +343,6 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./mobile.js?v=20260708-8"></script>
+    <script src="./mobile.js?v=20260708-12"></script>
   </body>
 </html>
