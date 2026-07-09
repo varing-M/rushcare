@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="러쉬케어" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>러쉬케어 모바일</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=20260708-5" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260709-3" />
     <link rel="apple-touch-icon" href="./app-icon.png" />
     <link rel="icon" href="./app-icon.png" />
-    <link rel="stylesheet" href="./mobile.css?v=20260708-12" />
+    <link rel="stylesheet" href="./mobile.css?v=20260709-3" />
     <style>
       body.auth-locked .app-header,
       body.auth-locked .app-main {
@@ -66,6 +66,20 @@
           비밀번호
           <input id="loginPassword" type="password" autocomplete="current-password" required />
         </label>
+        <details class="setup-panel" id="setupPanel">
+          <summary>DB 연동 설정</summary>
+          <div class="setup-body">
+            <label>
+              DB 웹앱 URL
+              <textarea id="loginScriptUrlInput" rows="3" placeholder="https://script.google.com/macros/s/.../exec"></textarea>
+            </label>
+            <div class="setup-actions">
+              <button id="loginSaveSettings" type="button" class="secondary">DB URL 저장</button>
+              <button id="testDbConnection" type="button">연동 확인</button>
+            </div>
+            <p class="hint">PC 프로그램에서 사용하는 Apps Script 웹앱 URL을 넣고 연동 확인을 누르세요.</p>
+          </div>
+        </details>
         <p class="login-message" id="loginMessage"></p>
         <button id="loginSubmit" type="submit">접속</button>
       </form>
@@ -343,6 +357,6 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./mobile.js?v=20260708-12"></script>
+    <script src="./mobile.js?v=20260709-3"></script>
   </body>
 </html>

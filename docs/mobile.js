@@ -14,6 +14,8 @@ const $ = (selector) => document.querySelector(selector);
 const els = {
   loginScreen: $("#loginScreen"), loginForm: $("#loginForm"), loginId: $("#loginId"),
   loginPassword: $("#loginPassword"), loginMessage: $("#loginMessage"), loginSubmit: $("#loginSubmit"),
+  setupPanel: $("#setupPanel"), loginScriptUrlInput: $("#loginScriptUrlInput"),
+  loginSaveSettings: $("#loginSaveSettings"), testDbConnection: $("#testDbConnection"),
   todayLabel: $("#todayLabel"), reloadBtn: $("#reloadBtn"), openSettings: $("#openSettings"),
   openJobDialog: $("#openJobDialog"), settingsDialog: $("#settingsDialog"), scriptUrlInput: $("#scriptUrlInput"),
   saveSettings: $("#saveSettings"), searchInput: $("#searchInput"), toast: $("#toast"),
@@ -38,6 +40,7 @@ function init() {
     year: "numeric", month: "long", day: "numeric", weekday: "short"
   }).format(new Date());
   els.scriptUrlInput.value = getSettings().scriptUrl || "";
+  if (els.loginScriptUrlInput) els.loginScriptUrlInput.value = getSettings().scriptUrl || "";
   const cached = loadCache();
   if (cached) state = normalizeData(cached);
   bindEvents();
@@ -53,6 +56,8 @@ function registerServiceWorker() {
 
 function bindEvents() {
   els.loginForm.addEventListener("submit", login);
+  els.loginSaveSettings.addEventListener("click", saveLoginDbUrl);
+  els.testDbConnection.addEventListener("click", testDbConnection);
   els.reloadBtn.addEventListener("click", loadFromDb);
   els.openSettings.addEventListener("click", () => els.settingsDialog.showModal());
   els.openJobDialog.addEventListener("click", () => openJobDialog());
@@ -71,8 +76,12 @@ function bindEvents() {
   $("#jobAmount").addEventListener("blur", formatJobAmountInput);
   $("#jobFee").addEventListener("input", formatJobFeeInput);
   $("#jobFee").addEventListener("blur", formatJobFeeInput);
+  document.querySelectorAll('input[type="tel"]').forEach((input) => {
+    input.addEventListener("input", formatPhoneInput);
+    input.addEventListener("blur", formatPhoneInput);
+  });
   els.saveSettings.addEventListener("click", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ scriptUrl: els.scriptUrlInput.value.trim() }));
+    saveDbUrl(els.scriptUrlInput.value.trim());
     showToast("DB 설정을 저장했습니다.");
   });
   els.searchInput.addEventListener("input", render);
@@ -128,8 +137,61 @@ function login(event) {
       if (!result || !result.ok) throw new Error(result?.error || "아이디 또는 비밀번호가 맞지 않습니다.");
       completeLogin(result.user || { username, name: username, role: "user" });
     })
-    .catch((error) => setLoginMessage(error.message || "DB 서버 오류입니다. 관리자에게 문의하세요.", true))
+    .catch((error) => setLoginMessage(formatDbError(error), true))
     .finally(() => { els.loginSubmit.disabled = false; });
+}
+
+function saveLoginDbUrl() {
+  const url = els.loginScriptUrlInput.value.trim();
+  if (!isValidScriptUrl(url)) {
+    setLoginMessage("DB 웹앱 URL을 정확히 입력하세요.", true);
+    return;
+  }
+  saveDbUrl(url);
+  setLoginMessage("DB URL을 저장했습니다. 연동 확인을 눌러 확인하세요.");
+}
+
+function saveDbUrl(url) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ scriptUrl: url || DEFAULT_SCRIPT_URL }));
+  els.scriptUrlInput.value = getSettings().scriptUrl || "";
+  if (els.loginScriptUrlInput) els.loginScriptUrlInput.value = getSettings().scriptUrl || "";
+}
+
+async function testDbConnection() {
+  if (busy) return;
+  const url = els.loginScriptUrlInput.value.trim();
+  if (!isValidScriptUrl(url)) {
+    setLoginMessage("DB 웹앱 URL을 정확히 입력하세요.", true);
+    return;
+  }
+  saveDbUrl(url);
+  busy = true;
+  els.testDbConnection.disabled = true;
+  setLoginMessage("DB 연동을 확인 중입니다.");
+  try {
+    const result = await jsonp(getScriptUrl(), { action: "getData" });
+    if (!result?.ok) throw new Error(result?.error || "DB 연동 확인에 실패했습니다.");
+    state = normalizeData(result.data || {});
+    saveCache();
+    render();
+    setLoginMessage("DB 연동이 확인되었습니다. 아이디와 비밀번호로 접속하세요.");
+  } catch (error) {
+    setLoginMessage(formatDbError(error), true);
+  } finally {
+    busy = false;
+    els.testDbConnection.disabled = false;
+  }
+}
+
+function isValidScriptUrl(url) {
+  return /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(\?.*)?$/.test(String(url || "").trim());
+}
+
+function formatDbError(error) {
+  const message = String(error?.message || error || "");
+  if (message.includes("아이디") || message.includes("비밀번호")) return message;
+  if (message.includes("URL") || message.includes("응답 시간이 초과")) return "DB 서버 오류입니다. 관리자에게 문의하세요.";
+  return message || "DB 서버 오류입니다. 관리자에게 문의하세요.";
 }
 
 function completeLogin(user) {
@@ -231,6 +293,7 @@ function openJobDialog(job = null) {
 async function submitJob(event) {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(els.jobForm).entries());
+  values.phone = formatPhoneNumber(values.phone);
   values.type = getJobTypeValue();
   values.amount = toNumber(values.amount);
   values.fee = toNumber(values.fee);
@@ -259,6 +322,7 @@ function openCustomerDialog(customer = null) {
 async function submitCustomer(event) {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(els.customerForm).entries());
+  values.phone = formatPhoneNumber(values.phone);
   const existing = state.customers.find((item) => item.id === values.id) || {};
   const customer = withTimestamps(existing, values);
   await saveEntity("upsertCustomer", customer, "customer", customer.id, els.customerDialog, "고객을 저장했습니다.");
@@ -274,6 +338,7 @@ function openTechDialog(tech = null) {
 async function submitTech(event) {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(els.techForm).entries());
+  values.phone = formatPhoneNumber(values.phone);
   const existing = state.technicians.find((item) => item.id === values.id) || {};
   const duplicatePhone = findDuplicatePhone(values.phone, state.technicians, values.id, ["phone"]);
   if (duplicatePhone) {
@@ -302,6 +367,8 @@ function openVendorDialog(vendor = null) {
 async function submitVendor(event) {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(els.vendorForm).entries());
+  values.phone = formatPhoneNumber(values.phone);
+  values.mobile = formatPhoneNumber(values.mobile);
   values.technicianIds = [...els.vendorForm.querySelectorAll('input[name="technicianIds"]:checked')].map((item) => item.value).join(",");
   const existing = state.vendors.find((item) => item.id === values.id) || {};
   const duplicatePhone = findDuplicatePhone(values.phone, state.vendors, values.id, ["phone", "mobile"]) || findDuplicatePhone(values.mobile, state.vendors, values.id, ["phone", "mobile"]);
@@ -327,6 +394,28 @@ function normalizeText(value) {
 
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "");
+}
+
+function formatPhoneInput(event) {
+  event.target.value = formatPhoneNumber(event.target.value);
+}
+
+function formatPhoneNumber(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/[^\d\s-]/.test(raw)) return raw;
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("02")) {
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+    if (digits.length <= 9) return `${digits.slice(0, 2)}-${digits.slice(2, digits.length - 4)}-${digits.slice(-4)}`;
+    return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
+  }
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  if (digits.length <= 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
 }
 
 function resolveDuplicateName(name, collection, currentId) {
@@ -472,11 +561,11 @@ function jsonp(url, params) {
 
 function normalizeData(data) {
   return {
-    customers: Array.isArray(data.customers) ? data.customers : [],
+    customers: Array.isArray(data.customers) ? data.customers.map((customer) => ({ ...customer, phone: formatPhoneNumber(customer.phone) })) : [],
     jobs: Array.isArray(data.jobs) ? data.jobs.map(normalizeJob) : [],
     photos: Array.isArray(data.photos) ? data.photos : [],
-    technicians: Array.isArray(data.technicians) ? data.technicians : [],
-    vendors: Array.isArray(data.vendors) ? data.vendors : []
+    technicians: Array.isArray(data.technicians) ? data.technicians.map((tech) => ({ ...tech, phone: formatPhoneNumber(tech.phone) })) : [],
+    vendors: Array.isArray(data.vendors) ? data.vendors.map((vendor) => ({ ...vendor, phone: formatPhoneNumber(vendor.phone), mobile: formatPhoneNumber(vendor.mobile) })) : []
   };
 }
 
@@ -487,7 +576,7 @@ function normalizeJob(job) {
     : status === "작업완료(미수)"
       ? false
       : job.paid === true || job.paid === "true";
-  return { ...job, date: normalizeDate(job.date), amount: toNumber(job.amount), fee: toNumber(job.fee), status, paid };
+  return { ...job, phone: formatPhoneNumber(job.phone), date: normalizeDate(job.date), amount: toNumber(job.amount), fee: toNumber(job.fee), status, paid };
 }
 
 function normalizeStatusName(status) {

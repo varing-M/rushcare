@@ -173,12 +173,57 @@ select {
   font-weight: 700;
 }
 
-.login-card input {
+.login-card input,
+.login-card textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
   outline: none;
+  font: inherit;
+}
+
+.login-card textarea {
+  resize: vertical;
+  min-height: 82px;
+}
+
+.setup-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #eef6f4;
+  overflow: hidden;
+}
+
+.setup-panel summary {
+  cursor: pointer;
+  padding: 12px;
+  font-weight: 800;
+  list-style-position: inside;
+}
+
+.setup-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+
+.setup-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.setup-actions button,
+.setup-body > button {
+  min-height: 44px;
+}
+
+.setup-body .hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .login-message {
