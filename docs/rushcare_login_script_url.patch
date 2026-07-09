@@ -1,0 +1,55 @@
+diff --git a/docs/index.html b/docs/index.html
+--- a/docs/index.html
++++ b/docs/index.html
+@@ -47,6 +47,12 @@
+  <input id="loginPassword" type="password" autocomplete="current-password" required />
+ 
+  </label>
++
++ <label>
++ 구글 연동 주소
++ <textarea id="loginScriptUrlInput" rows="3" placeholder="https://script.google.com/macros/s/.../exec"></textarea>
++ <small>한 번 저장하면 다음 접속부터 자동으로 유지됩니다.</small>
++ </label>
+ 
+  <p class="login-message" id="loginMessage"></p>
+ 
+diff --git a/docs/mobile.js b/docs/mobile.js
+--- a/docs/mobile.js
++++ b/docs/mobile.js
+@@ -22,7 +22,7 @@
+ const els = {
+  loginScreen: $("#loginScreen"), loginForm: $("#loginForm"), loginId: $("#loginId"),
+ 
+- loginPassword: $("#loginPassword"), loginMessage: $("#loginMessage"), loginSubmit: $("#loginSubmit"),
++ loginPassword: $("#loginPassword"), loginScriptUrlInput: $("#loginScriptUrlInput"), loginMessage: $("#loginMessage"), loginSubmit: $("#loginSubmit"),
+@@ -66,6 +66,8 @@
+  els.scriptUrlInput.value = getSettings().scriptUrl || "";
++
++ if (els.loginScriptUrlInput) els.loginScriptUrlInput.value = getSettings().scriptUrl || "";
+ 
+  const cached = loadCache();
+@@ -200,6 +202,12 @@
+  const username = els.loginId.value.trim();
+ 
+  const password = els.loginPassword.value.trim();
++
++ const loginScriptUrl = els.loginScriptUrlInput?.value.trim();
++
++ if (loginScriptUrl) {
++  saveSettings(loginScriptUrl);
++ }
+ 
+  setLoginMessage("확인 중입니다.");
+@@ -287,6 +295,16 @@
+ function getScriptUrl() { return getSettings().scriptUrl || DEFAULT_SCRIPT_URL; }
++
++function saveSettings(scriptUrl) {
++ const nextUrl = String(scriptUrl || "").trim() || DEFAULT_SCRIPT_URL;
++ localStorage.setItem(STORAGE_KEY, JSON.stringify({ scriptUrl: nextUrl }));
++ if (els.scriptUrlInput) els.scriptUrlInput.value = nextUrl;
++ if (els.loginScriptUrlInput) els.loginScriptUrlInput.value = nextUrl;
++ return nextUrl;
++}
+ 
+ function loadCache() {
